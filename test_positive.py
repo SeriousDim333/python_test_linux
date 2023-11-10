@@ -1,83 +1,90 @@
-import subprocess
 
-tst = "/home/user/tst"
-out = "/home/user/out"
-folder1 = "/home/user/folder1"
-folder2 = "/home/user/folder2"
+import yaml
+from checkers import checkout, getout
 
 
-def checkout(cmd, text):
-    result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, encoding='utf-8')
-    if text in result.stdout and result.returncode == 0:
-        return True
-    else:
-        return False
+with open('config.yaml') as f:
+    data = yaml.safe_load(f)
 
 
-def test_step1():
-    """
-    архивирование файлов (а)
-    """
-    result1 = checkout("cd {}; 7z a {}/arx2".format(tst, out), "Everything is Ok")
-    result2 = checkout("cd {}; ls".format(out), "arx2.7z")
-    assert result1 and result2, "test1 fail"
+class TestPositive:
+    def test_step1(self, make_folders, clear_folders, make_files):
+        """
+        архивирование файлов (а)
+        """
+        result1 = checkout("cd {}; 7z a -t{} {}/arx2".format( data["folder_in"], data["type"], data["folder_out"]), "Everything is Ok")
+        result2 = checkout("ls {}".format(data["folder_out"]), "arx2.{}".format(data["type"]))
+        assert result1 and result2, "test1 fail"
 
 
-def test_step6():
-    """
-    список файлов (l)
-    """
-    result1 = checkout("cd {}; 7z l arx2.7z".format(out), "qwer")
-    result2 = checkout("cd {}; 7z l arx2.7z".format(out), "asdf")
-    assert result1 and result2, "test6 fail"
+    def test_step2(self, clear_folders, make_files):
+        """
+        разархивирование (е)
+        """
+        res = []
+        res.append(checkout("cd {}; 7z a -t{} {}/arx2".format(data["folder_in"], data["type"], data["folder_out"]), "Everything is Ok"))
+        res.append(checkout("cd {}; 7z e arx2.{} -o{} -y".format(data["folder_out"], data["type"], data["folder_ext"]), "Everything is Ok"))
+        for item in make_files:
+            res.append(checkout("ls {}".format(data["folder_ext"]), item))
+        assert all(res), "test2 fail"
 
 
-def test_step8():
-    """
-    хэш архива (h)
-    """
-    result = subprocess.run("cd {}; 7z h arx2.7z".format(out), shell=True, stdout=subprocess.PIPE, encoding='utf-8')
-    text = result.stdout.split()
-    result2 = checkout("cd {}; crc32 arx2.7z".format(out), text[-4].lower())
-    assert result2, "test8 fail"
+    def test_step3(self):
+        """
+        целостность архива (t)
+        """
+        assert checkout("cd {}; 7z t arx2.{}".format(data["folder_out"], data["type"]), "Everything is Ok"), "test3 fail"
 
 
-def test_step2():
-    """
-    разархивирование (е)
-    """
-    result1 = checkout("cd {}; 7z e arx2.7z -o{} -y".format(out, folder1), "Everything is Ok")
-    result2 = checkout("cd {}; ls".format(folder1), "qwer")
-    result3 = checkout("cd {}; ls".format(folder1), "asdf")
-    assert result1 and result2 and result3, "test2 fail"
+    def test_step4(self):
+        """
+        обновление файлов в архиве (u)
+        """
+        assert checkout("cd {}; 7z u ../out/arx2.{}".format(data["folder_in"],data["type"]), "Everything is Ok"), "test4 fail"
 
 
-def test_step7():
-    """
-    разархивирование с сохранением структуры (х)
-    """
-    result1 = checkout("cd {}; 7z x arx2.7z -o{} -y".format(out, folder2), "Everything is Ok")
-    result2 = checkout("cd {}; ls".format(folder2), "qwer")
-    result3 = checkout("cd {}/q; ls".format(folder2), "asdf")
-    assert result1 and result2 and result3, "test7 fail"
+    def test_step5(self, clear_folders, make_files):
+        """
+        список файлов (l)
+        """
+        res = []
+        res.append(checkout("cd {}; 7z a -t{} {}/arx2".format(data["folder_in"], data["type"], data["folder_out"]), "Everything is Ok"))
+        for item in make_files:
+            res.append(checkout("cd {}; 7z l arx2.{}".format(data["folder_out"], data["type"]), item))
+        assert all(res), "test5 fail"
 
 
-def test_step3():
-    """
-    целостность архива (t)
-    """
-    assert checkout("cd {}; 7z t arx2.7z".format(out), "Everything is Ok"), "test3 fail"
+    def test_step6(self, clear_folders, make_files, make_subfolder):
+        """
+        разархивирование с сохранением структуры (х)
+        """
+        res = []
+        res.append(checkout("cd {}; 7z a -t{} {}/arx".format(data["folder_in"], data["type"], data["folder_out"]), "Everything is Ok"))
+        res.append(checkout("cd {}; 7z x arx.{} -o{} -y".format(data["folder_out"], data["type"], data["folder_ext2"]), "Everything is Ok"))
+
+        for item in make_files:
+            res.append(checkout("ls {}".format(data["folder_ext2"]), item))
+
+        res.append(checkout("ls {}".format(data["folder_ext2"]), make_subfolder[0]))
+        res.append(checkout("ls {}/{}".format(data["folder_ext2"], make_subfolder[0]), make_subfolder[1]))
+        assert all(res), "test6 fail"
+
+    def test_step7(self):
+        """
+        удаление файлов из архива (d)
+        """
+        assert checkout("cd {}; 7z d arx.{}".format(data["folder_out"], data["type"]), "Everything is Ok"), "test7 fail"
+
+    def test_step8(self, clear_folders, make_files):
+        """
+        хэш архива (h)
+        """
+        res = []
+        for item in make_files:
+            res.append(checkout("cd {}; 7z h {}".format(data["folder_in"], item), "Everything is Ok"))
+            hash = getout("cd {}; crc32 {}".format(data["folder_in"], item)).upper()
+            res.append(checkout("cd {}; 7z h {}".format(data["folder_in"], item), hash))
+        assert all(res), "test8 fail"
 
 
-def test_step4():
-    """
-    обновление файлов в архиве (u)
-    """
-    assert checkout("cd {}; 7z u ../out/arx2.7z".format(tst), "Everything is Ok"), "test4 fail"
 
-
-def test_step5():
-    """
-    удаление файлов из архива (d)
-    """
-    assert checkout("cd {}; 7z d arx2.7z".format(out), "Everything is Ok"), "test3 fail"
