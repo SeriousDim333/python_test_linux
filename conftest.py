@@ -70,8 +70,8 @@ def make_bad_arx():
 def stat(request):
     time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     name = request.node.name
-    # out = ssh_get("0.0.0.0", "user2", "1111", "echo '1111' | sudo -S journalctl --since '{}'".format(time))
-    out = getout("echo '1111' | sudo -S journalctl --since '{}'".format(time))
+    out = ssh_get("0.0.0.0", "user2", "1111", "echo '1111' | sudo -S journalctl --since '{}'".format(time))
+    # out = getout("echo '1111' | sudo -S journalctl --since '{}'".format(time))
     with open("stat.txt", "a", encoding="utf-8") as f, open("/proc/loadavg", "r", encoding="utf-8") as fr:
         f.write(f'{name}\ntime start: {time}\ncount = {data["count"]}, size = {data["bs"]}\nCPU load: {fr.readlines()[-1]} \nOUT:{out} \n')
 
