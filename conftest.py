@@ -1,6 +1,6 @@
 from files import upload_files
 import pytest
-from checkers import checkout, ssh_checkout, ssh_get
+from checkers import checkout, ssh_checkout, ssh_get, getout
 import random, string
 import yaml
 from datetime import datetime
@@ -70,7 +70,8 @@ def make_bad_arx():
 def stat(request):
     time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     name = request.node.name
-    out = ssh_get("0.0.0.0", "user2", "1111", "journalctl -q --since '{}'".format(time))
+    # out = ssh_get("0.0.0.0", "user2", "1111", "echo '1111' | sudo -S journalctl --since '{}'".format(time))
+    out = getout("echo '1111' | sudo -S journalctl --since '{}'".format(time))
     with open("stat.txt", "a", encoding="utf-8") as f, open("/proc/loadavg", "r", encoding="utf-8") as fr:
         f.write(f'{name}\ntime start: {time}\ncount = {data["count"]}, size = {data["bs"]}\nCPU load: {fr.readlines()[-1]} \nOUT:{out} \n')
 
@@ -89,13 +90,13 @@ def deploy():
     return all(res)
 
 
-@pytest.fixture(autouse=True, scope="module")
-def start_time():
-    time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    return time
-
-
-@pytest.fixture(autouse=True, scope="module")
-def safe_log(start_time):
-    with open("stat2.txt", "w") as f:
-        f.write(ssh_get("0.0.0.0", "user2", "1111", "echo '1111' | sudo journalctl --since '{}'".format(start_time)))
+# @pytest.fixture(autouse=True, scope="module")
+# def start_time():
+#     time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+#     return time
+#
+#
+# @pytest.fixture(autouse=True, scope="module")
+# def safe_log(start_time):
+#     with open("stat2.txt", "w") as f:
+#         f.write(ssh_get("0.0.0.0", "user2", "1111", "echo '1111' | sudo -S journalctl --since '{}'".format(start_time)))
